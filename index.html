@@ -59,7 +59,7 @@ function showLevelMenu(scene) {
     let title = scene.add.text(0, -120, '聽聽顏色', { fontSize: '52px', fill: '#fff', fontWeight: 'bold' }).setOrigin(0.5);
     
     let btn1 = createMenuBtn(scene, 0, '第一關 (4色)', () => startSetup(scene, ['red', 'yellow', 'green', 'blue'], 6));
-    let btn2 = createMenuBtn(scene, 100, '第二關 (8色)', () => startSetup(scene, Object.keys(COLORS), 10));
+    let btn2 = createMenuBtn(scene, 100, '第二關 (10 題)', () => startSetup(scene, Object.keys(COLORS), 10));
     
     menuContainer.add([bg, title, btn1, btn2]);
 }
@@ -87,42 +87,34 @@ function startSetup(scene, colorKeys, totalRounds) {
     }
     gameQueue = Phaser.Utils.Array.Shuffle(gameQueue);
 
-    // --- NEW ERGONOMIC LAYOUT ---
-    
-    // 1. Speaker moved to the LEFT of the object
+    // Speaker moved safely to the far left (Fixed X)
     speakerIcon = scene.add.text(80, 300, '🔈', { fontSize: '90px' }).setOrigin(0.5).setInteractive();
     speakerIcon.on('pointerdown', () => { 
         if(scene.sound.get(currentTarget.color + '_vo')) scene.sound.play(currentTarget.color + '_vo'); 
     });
     scene.tweens.add({ targets: speakerIcon, scale: 1.1, duration: 600, yoyo: true, repeat: -1 });
 
-    // 2. Main Object in the Mid-Left
-    mainObject = scene.add.image(320, 300, OBJECT_KEYS[0]).setOrigin(0.5);
+    // Main Object positioned with plenty of space (X shifted slightly right to 340)
+    mainObject = scene.add.image(340, 300, OBJECT_KEYS[0]).setOrigin(0.5);
     
     scoreText = scene.add.text(450, 40, '', { fontSize: '30px', fill: '#6c757d', fontWeight: 'bold' }).setOrigin(0.5);
 
-    // 3. Color Cards moved to MIDDLE RIGHT (Easier to reach)
     colorKeys.forEach((key, i) => {
-        let x = 620 + (i % 2 * 145); // Closer to center
+        let x = 620 + (i % 2 * 145);
         let y = 140 + (Math.floor(i / 2) * 110);
         let card = scene.add.container(x, y);
-        
         let r = scene.add.rectangle(0, 0, 130, 95, COLORS[key].hex).setStrokeStyle(5, 0xffffff);
         let textColor = (key === 'white' || key === 'yellow') ? '#333' : '#fff';
         let t = scene.add.text(0, 0, COLORS[key].text, { fontSize: '32px', fill: textColor, fontWeight: 'bold' }).setOrigin(0.5);
-        
         card.add([r, t]).setSize(130, 95).setData('key', key).setData('hex', COLORS[key].hex);
         wordCards.push(card);
     });
 
-    // 4. BIGGER BRUSH for small fingers
-    // Increased size from 150 to 220
+    // Big Brush (220px)
     brush = scene.add.image(780, 500, 'brush').setDisplaySize(220, 220).setDepth(20).setInteractive();
     brush.setData('startX', 780).setData('startY', 500);
 
     scene.input.setDraggable(brush);
-    
-    // Increased drag offset so finger is completely clear of the brush
     scene.input.on('drag', (p, obj, dx, dy) => { 
         obj.x = dx; 
         obj.y = dy - 100; 
@@ -131,7 +123,6 @@ function startSetup(scene, colorKeys, totalRounds) {
     scene.input.on('dragend', (p, obj) => {
         let hit = null;
         wordCards.forEach(c => {
-            // Increased hit distance (generous target area)
             if (Phaser.Math.Distance.Between(obj.x, obj.y, c.x, c.y) < 110) hit = c;
         });
 
@@ -154,7 +145,7 @@ function nextRound(scene) {
     if (trialCount >= gameQueue.length) {
         scene.sound.play('congrats');
         scene.add.rectangle(450, 300, 900, 600, 0x000000, 0.8).setDepth(1000);
-        scene.add.text(450, 300, '你好努力呀！你認得晒喇！', { fontSize: '60px', fill: '#fff', align: 'center' }).setOrigin(0.5).setDepth(1001);
+        scene.add.text(450, 300, '好叻呀！\n你認得晒喇！', { fontSize: '60px', fill: '#fff', align: 'center' }).setOrigin(0.5).setDepth(1001);
         scene.time.delayedCall(4000, () => window.location.reload());
         return;
     }
@@ -165,9 +156,21 @@ function nextRound(scene) {
     
     if (scene.textures.exists(currentTarget.obj)) {
         mainObject.setTexture(currentTarget.obj).clearTint();
-        let r = mainObject.width / mainObject.height;
-        mainObject.displayHeight = 350; 
-        mainObject.displayWidth = 350 * r;
+        
+        // --- SMART SCALING BOX (320x320) ---
+        // This ensures wide objects (shoes) and tall objects (bottles)
+        // both fit perfectly without touching the speaker.
+        let ratio = mainObject.width / mainObject.height;
+        let maxWidth = 320;
+        let maxHeight = 320;
+
+        if (ratio > 1) { // Wide object (e.g. Shoe)
+            mainObject.displayWidth = maxWidth;
+            mainObject.displayHeight = maxWidth / ratio;
+        } else { // Tall object (e.g. Bottle)
+            mainObject.displayHeight = maxHeight;
+            mainObject.displayWidth = maxHeight * ratio;
+        }
     }
 
     if (scene.cache.audio.exists(currentTarget.color + '_vo')) {
