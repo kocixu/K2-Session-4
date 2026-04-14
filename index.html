@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>聽音認色</title>
+    <title>聽音認色：靈敏優化版</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser-arcade-physics.min.js"></script>
     <style>
         body { margin: 0; padding: 0; background-color: #fdfcf5; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
@@ -46,29 +46,40 @@ function preload() {
 }
 
 function create() {
-    this.input.once('pointerdown', () => {
+    // Immediate audio unlock
+    this.input.on('pointerdown', () => {
         if (this.sound.context.state === 'suspended') this.sound.context.resume();
     });
-    startSetup(this, Object.keys(COLORS), 10); // Default to full set
+    
+    startSetup(this, Object.keys(COLORS), 10);
 }
 
 function startSetup(scene, colorKeys, totalRounds) {
     wordCards = [];
     trialCount = 0;
 
-    gameQueue = [];
+    let tempQueue = [];
     for(let i=0; i < totalRounds; i++) {
-        gameQueue.push({ 
+        tempQueue.push({ 
             color: colorKeys[i % colorKeys.length], 
             obj: OBJECT_KEYS[i % OBJECT_KEYS.length] 
         });
     }
-    gameQueue = Phaser.Utils.Array.Shuffle(gameQueue);
+    gameQueue = Phaser.Utils.Array.Shuffle(tempQueue);
 
-    speakerIcon = scene.add.text(80, 300, '🔈', { fontSize: '90px' }).setOrigin(0.5).setInteractive();
+    // SPEAKER: Moved to high depth to ensure it clicks every time
+    speakerIcon = scene.add.text(80, 300, '🔈', { fontSize: '100px' })
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true })
+        .setDepth(1000);
+        
     speakerIcon.on('pointerdown', () => { 
-        if(scene.sound.get(currentTarget.color + '_vo')) scene.sound.play(currentTarget.color + '_vo'); 
+        if (scene.sound.get(currentTarget.color + '_vo')) {
+            scene.sound.play(currentTarget.color + '_vo');
+        }
     });
+
+    // Pulse animation for the speaker
     scene.tweens.add({ targets: speakerIcon, scale: 1.1, duration: 600, yoyo: true, repeat: -1 });
 
     mainObject = scene.add.image(340, 300, OBJECT_KEYS[0]).setOrigin(0.5);
@@ -78,12 +89,9 @@ function startSetup(scene, colorKeys, totalRounds) {
         let x = 620 + (i % 2 * 155);
         let y = 140 + (Math.floor(i / 2) * 110);
         let card = scene.add.container(x, y);
-        
-        // Card Background
         let r = scene.add.rectangle(0, 0, 140, 100, COLORS[key].hex).setStrokeStyle(5, 0xffffff);
         let textColor = (key === 'white' || key === 'yellow') ? '#333' : '#fff';
         let t = scene.add.text(0, 0, COLORS[key].text, { fontSize: '32px', fill: textColor, fontWeight: 'bold' }).setOrigin(0.5);
-        
         card.add([r, t]).setSize(140, 100).setData('key', key).setData('hex', COLORS[key].hex);
         wordCards.push(card);
     });
@@ -94,23 +102,15 @@ function startSetup(scene, colorKeys, totalRounds) {
     scene.input.setDraggable(brush);
     scene.input.on('drag', (p, obj, dx, dy) => { 
         obj.x = dx; 
-        obj.y = dy - 100; // Finger offset
+        obj.y = dy - 110; 
     });
     
     scene.input.on('dragend', (p, obj) => {
         let hit = null;
-
-        // NEW LOGIC: Check if brush overlaps the card bounds
-        wordCards.forEach(card => {
-            // Create a "Rectangle" bounds for the card
-            let bounds = card.getBounds();
-            // Inflate bounds by 20px to make it even MORE sensitive (easier for kids)
-            Phaser.Geom.Rectangle.Inflate(bounds, 20, 20);
-
-            // Check if the center of the brush is within the card rectangle
-            if (Phaser.Geom.Rectangle.Contains(bounds, obj.x, obj.y)) {
-                hit = card;
-            }
+        // ULTRA SENSITIVE: Increased hit radius significantly (130px)
+        wordCards.forEach(c => {
+            let distance = Phaser.Math.Distance.Between(obj.x, obj.y, c.x, c.y);
+            if (distance < 130) hit = c; 
         });
 
         if (hit && hit.getData('key') === currentTarget.color) {
@@ -131,8 +131,8 @@ function startSetup(scene, colorKeys, totalRounds) {
 function nextRound(scene) {
     if (trialCount >= gameQueue.length) {
         scene.sound.play('congrats');
-        scene.add.rectangle(450, 300, 900, 600, 0x000000, 0.8).setDepth(1000);
-        scene.add.text(450, 300, '完成！\n你好用心呀！', { fontSize: '60px', fill: '#fff', align: 'center' }).setOrigin(0.5).setDepth(1001);
+        let overlay = scene.add.rectangle(450, 300, 900, 600, 0x000000, 0.8).setDepth(2000);
+        scene.add.text(450, 300, '好叻呀！\n你全對喇！', { fontSize: '70px', fill: '#fff', align: 'center' }).setOrigin(0.5).setDepth(2001);
         scene.time.delayedCall(4000, () => window.location.reload());
         return;
     }
@@ -151,9 +151,12 @@ function nextRound(scene) {
         }
     }
 
-    if (scene.sound.get(currentTarget.color + '_vo')) {
-        scene.sound.play(currentTarget.color + '_vo');
-    }
+    // Play Voice immediately upon round start
+    scene.time.delayedCall(300, () => {
+        if (scene.sound.get(currentTarget.color + '_vo')) {
+            scene.sound.play(currentTarget.color + '_vo');
+        }
+    });
 }
 </script>
 </body>
