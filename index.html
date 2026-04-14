@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>小畫家：全方位認色</title>
+    <title>小畫家：認文字</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser-arcade-physics.min.js"></script>
     <style>
-        body { margin: 0; padding: 0; background-color: #f8f8f8; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        canvas { border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); }
+        body { margin: 0; padding: 0; background-color: #ffffff; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
     </style>
 </head>
 <body>
@@ -33,18 +32,26 @@ const COLORS = {
 };
 
 const OBJECT_KEYS = ['bottle', 'bag', 'towel', 'paper', 'shoe', 'tissue'];
-
-let brush, mainObject, currentTarget, wordCards = [];
-let gameQueue = [], trialCount = 0, scoreText, menuContainer;
+let brush, mainObject, currentTarget, wordCards = [], gameQueue = [], trialCount = 0, scoreText, menuContainer;
 
 function preload() {
+    // Show loading progress so we know it hasn't crashed
+    let loadTxt = this.add.text(450, 300, 'Loading 載入中...', { fontSize: '24px', fill: '#000' }).setOrigin(0.5);
+
+    // SILENT ERROR HANDLING: Don't crash if a file is missing
+    this.load.on('loaderror', (file) => {
+        console.warn('Skipping missing file:', file.key);
+    });
+
     this.load.image('brush', 'assets/brush.png');
     OBJECT_KEYS.forEach(obj => this.load.image(obj, `assets/${obj}.png`));
-    
     Object.keys(COLORS).forEach(c => this.load.audio(c + '_vo', `assets/${c}_vo.mp3`));
+    
     this.load.audio('correct', 'assets/correct.mp3');
     this.load.audio('wrong', 'assets/wrong.mp3');
     this.load.audio('congrats', 'assets/congrats.mp3');
+
+    this.load.on('complete', () => { loadTxt.destroy(); });
 }
 
 function create() {
@@ -54,7 +61,7 @@ function create() {
 function showLevelMenu(scene) {
     menuContainer = scene.add.container(450, 300).setDepth(100);
     let bg = scene.add.rectangle(0, 0, 900, 600, 0x000000, 0.85);
-    let title = scene.add.text(0, -100, '請選擇關卡', { fontSize: '40px', fill: '#fff' }).setOrigin(0.5);
+    let title = scene.add.text(0, -120, '小畫家：認文字', { fontSize: '42px', fill: '#fff' }).setOrigin(0.5);
     
     let btn1 = createMenuBtn(scene, 0, '第一關 (4色)', () => startSetup(scene, ['red', 'yellow', 'green', 'blue']));
     let btn2 = createMenuBtn(scene, 100, '第二關 (8色)', () => startSetup(scene, Object.keys(COLORS)));
@@ -64,8 +71,8 @@ function showLevelMenu(scene) {
 
 function createMenuBtn(scene, y, label, cb) {
     let container = scene.add.container(0, y);
-    let rect = scene.add.rectangle(0, 0, 300, 70, 0xFFA500).setInteractive().setStrokeStyle(3, 0xffffff);
-    let txt = scene.add.text(0, 0, label, { fontSize: '28px', fill: '#fff' }).setOrigin(0.5);
+    let rect = scene.add.rectangle(0, 0, 320, 80, 0xFFA500).setInteractive().setStrokeStyle(4, 0xffffff);
+    let txt = scene.add.text(0, 0, label, { fontSize: '30px', fill: '#fff' }).setOrigin(0.5);
     container.add([rect, txt]);
     rect.on('pointerdown', cb);
     return container;
@@ -75,28 +82,74 @@ function startSetup(scene, colorKeys) {
     menuContainer.destroy();
     if (scene.sound.context.state === 'suspended') scene.sound.context.resume();
 
-    // CREATE QUEUE: Pairs every color with objects and shuffles
-    let tempQueue = [];
-    colorKeys.forEach(ckey => {
-        tempQueue.push({ color: ckey, obj: Phaser.Utils.Array.GetRandom(OBJECT_KEYS) });
-    });
-    gameQueue = Phaser.Utils.Array.Shuffle(tempQueue);
-    
-    // UI Elements
-    mainObject = scene.add.image(280, 300, OBJECT_KEYS[0]).setOrigin(0.5);
-    createWordPalette(scene, colorKeys);
+    // Prepare Queue
+    let temp = [];
+    colorKeys.forEach(k => temp.push({ color: k, obj: OBJECT_KEYS[Math.floor(Math.random()*OBJECT_KEYS.length)] }));
+    gameQueue = Phaser.Utils.Array.Shuffle(temp);
 
-    // BIGGER BRUSH for 5yo fingers
+    // Layout
+    mainObject = scene.add.image(280, 300, OBJECT_KEYS[0]).setOrigin(0.5);
+    
+    // Palette
+    colorKeys.forEach((key, i) => {
+        let x = 650 + (i % 2 * 145);
+        let y = 130 + (Math.floor(i / 2) * 110);
+        let card = scene.add.container(x, y);
+        let r = scene.add.rectangle(0, 0, 130, 80, COLORS[key].hex, 0.1).setStrokeStyle(4, COLORS[key].hex);
+        let t = scene.add.text(0, 0, COLORS[key].text, { fontSize: '32px', fill: '#333', fontWeight: 'bold' }).setOrigin(0.5);
+        card.add([r, t]).setSize(130, 80).setData('key', key).setData('hex', COLORS[key].hex);
+        wordCards.push(card);
+    });
+
     brush = scene.add.image(780, 500, 'brush').setDisplaySize(160, 160).setDepth(20).setInteractive();
     brush.setData('startX', 780).setData('startY', 500);
     
-    scoreText = scene.add.text(450, 40, `進度: 0 / ${gameQueue.length}`, { fontSize: '28px', fill: '#333', fontWeight: 'bold' }).setOrigin(0.5);
-
+    scoreText = scene.add.text(450, 40, '', { fontSize: '28px', fill: '#333' }).setOrigin(0.5);
+    
     scene.input.setDraggable(brush);
-    scene.input.on('drag', (p, obj, dx, dy) => { 
-        obj.x = dx; 
-        obj.y = dy - 50; // Offset so finger doesn't cover the brush head
-    });
-    scene.input.on('dragend', (p, obj) => checkAnswer(scene, obj));
+    scene.input.on('drag', (p, obj, dx, dy) => { obj.x = dx; obj.y = dy - 60; });
+    scene.input.on('dragend', (p, obj) => {
+        let hit = null;
+        wordCards.forEach(c => {
+            if (Phaser.Math.Distance.Between(obj.x, obj.y, c.x, c.y) < 90) hit = c;
+        });
 
-    next
+        if (hit && hit.getData('key') === currentTarget.color) {
+            if (scene.cache.audio.exists('correct')) scene.sound.play('correct');
+            mainObject.setTint(hit.getData('hex'));
+            obj.setTint(hit.getData('hex'));
+            trialCount++;
+            scene.time.delayedCall(1500, () => nextRound(scene));
+        } else {
+            if (scene.cache.audio.exists('wrong')) scene.sound.play('wrong');
+            scene.tweens.add({ targets: obj, x: 780, y: 500, duration: 300 });
+        }
+    });
+
+    nextRound(scene);
+}
+
+function nextRound(scene) {
+    if (trialCount >= gameQueue.length) {
+        if (scene.cache.audio.exists('congrats')) scene.sound.play('congrats');
+        scene.add.rectangle(450, 300, 900, 600, 0x000000, 0.8).setDepth(1000);
+        scene.add.text(450, 300, '叻叻！完成！', { fontSize: '60px', fill: '#fff' }).setOrigin(0.5).setDepth(1001);
+        scene.time.delayedCall(4000, () => window.location.reload());
+        return;
+    }
+    currentTarget = gameQueue[trialCount];
+    scoreText.setText(`進度: ${trialCount + 1} / ${gameQueue.length}`);
+    
+    brush.setPosition(780, 500).clearTint();
+    mainObject.setTexture(currentTarget.obj).clearTint();
+    
+    // Scale Fix
+    let r = mainObject.width / mainObject.height;
+    if (r > 1) { mainObject.displayWidth = 350; mainObject.displayHeight = 350/r; }
+    else { mainObject.displayHeight = 350; mainObject.displayWidth = 350*r; }
+
+    if (scene.cache.audio.exists(currentTarget.color + '_vo')) scene.sound.play(currentTarget.color + '_vo');
+}
+</script>
+</body>
+</html>
