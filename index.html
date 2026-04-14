@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>色彩與文字：聽音認色版</title>
+    <title>聽音認色</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser-arcade-physics.min.js"></script>
     <style>
         body { margin: 0; padding: 0; background-color: #fdfcf5; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
@@ -56,18 +56,18 @@ function showLevelMenu(scene) {
     if(menuContainer) menuContainer.destroy();
     menuContainer = scene.add.container(450, 300).setDepth(100);
     let bg = scene.add.rectangle(0, 0, 900, 600, 0x000000, 0.85);
-    let title = scene.add.text(0, -120, '聽一聽，認顏色', { fontSize: '48px', fill: '#fff', fontWeight: 'bold' }).setOrigin(0.5);
+    let title = scene.add.text(0, -120, '聽聽顏色', { fontSize: '52px', fill: '#fff', fontWeight: 'bold' }).setOrigin(0.5);
     
-    let btn1 = createMenuBtn(scene, 0, '基礎顏色 (4色)', () => startSetup(scene, ['red', 'yellow', 'green', 'blue'], 6));
-    let btn2 = createMenuBtn(scene, 100, '進階顏色 (8色)', () => startSetup(scene, Object.keys(COLORS), 10));
+    let btn1 = createMenuBtn(scene, 0, '第一關 (4色)', () => startSetup(scene, ['red', 'yellow', 'green', 'blue'], 6));
+    let btn2 = createMenuBtn(scene, 100, '第二關 (8色)', () => startSetup(scene, Object.keys(COLORS), 10));
     
     menuContainer.add([bg, title, btn1, btn2]);
 }
 
 function createMenuBtn(scene, y, label, cb) {
     let container = scene.add.container(0, y);
-    let rect = scene.add.rectangle(0, 0, 350, 80, 0xFFA500).setInteractive({useHandCursor: true}).setStrokeStyle(4, 0xffffff);
-    let txt = scene.add.text(0, 0, label, { fontSize: '32px', fill: '#fff' }).setOrigin(0.5);
+    let rect = scene.add.rectangle(0, 0, 350, 90, 0xFFA500).setInteractive({useHandCursor: true}).setStrokeStyle(4, 0xffffff);
+    let txt = scene.add.text(0, 0, label, { fontSize: '36px', fill: '#fff', fontWeight: 'bold' }).setOrigin(0.5);
     container.add([rect, txt]);
     rect.on('pointerdown', cb);
     return container;
@@ -87,38 +87,52 @@ function startSetup(scene, colorKeys, totalRounds) {
     }
     gameQueue = Phaser.Utils.Array.Shuffle(gameQueue);
 
-    // Layout Improvements: Shifted main image to the left
-    mainObject = scene.add.image(280, 320, OBJECT_KEYS[0]).setOrigin(0.5);
+    // --- NEW ERGONOMIC LAYOUT ---
+    
+    // 1. Speaker moved to the LEFT of the object
+    speakerIcon = scene.add.text(80, 300, '🔈', { fontSize: '90px' }).setOrigin(0.5).setInteractive();
+    speakerIcon.on('pointerdown', () => { 
+        if(scene.sound.get(currentTarget.color + '_vo')) scene.sound.play(currentTarget.color + '_vo'); 
+    });
+    scene.tweens.add({ targets: speakerIcon, scale: 1.1, duration: 600, yoyo: true, repeat: -1 });
+
+    // 2. Main Object in the Mid-Left
+    mainObject = scene.add.image(320, 300, OBJECT_KEYS[0]).setOrigin(0.5);
+    
     scoreText = scene.add.text(450, 40, '', { fontSize: '30px', fill: '#6c757d', fontWeight: 'bold' }).setOrigin(0.5);
 
-    // Speaker Visual Prompt
-    speakerIcon = scene.add.text(280, 130, '🔈', { fontSize: '60px' }).setOrigin(0.5).setInteractive();
-    speakerIcon.on('pointerdown', () => { if(scene.sound.get(currentTarget.color + '_vo')) scene.sound.play(currentTarget.color + '_vo'); });
-    scene.tweens.add({ targets: speakerIcon, scale: 1.2, duration: 500, yoyo: true, repeat: -1 });
-
-    // Colorful Cards
+    // 3. Color Cards moved to MIDDLE RIGHT (Easier to reach)
     colorKeys.forEach((key, i) => {
-        let x = 650 + (i % 2 * 145);
+        let x = 620 + (i % 2 * 145); // Closer to center
         let y = 140 + (Math.floor(i / 2) * 110);
         let card = scene.add.container(x, y);
         
-        // EMPHASIS: Solid colored background instead of outline
-        let r = scene.add.rectangle(0, 0, 130, 90, COLORS[key].hex).setStrokeStyle(4, 0xffffff);
+        let r = scene.add.rectangle(0, 0, 130, 95, COLORS[key].hex).setStrokeStyle(5, 0xffffff);
         let textColor = (key === 'white' || key === 'yellow') ? '#333' : '#fff';
         let t = scene.add.text(0, 0, COLORS[key].text, { fontSize: '32px', fill: textColor, fontWeight: 'bold' }).setOrigin(0.5);
         
-        card.add([r, t]).setSize(130, 90).setData('key', key).setData('hex', COLORS[key].hex).setInteractive();
+        card.add([r, t]).setSize(130, 95).setData('key', key).setData('hex', COLORS[key].hex);
         wordCards.push(card);
     });
 
-    brush = scene.add.image(780, 520, 'brush').setDisplaySize(150, 150).setDepth(20).setInteractive();
+    // 4. BIGGER BRUSH for small fingers
+    // Increased size from 150 to 220
+    brush = scene.add.image(780, 500, 'brush').setDisplaySize(220, 220).setDepth(20).setInteractive();
+    brush.setData('startX', 780).setData('startY', 500);
+
     scene.input.setDraggable(brush);
-    scene.input.on('drag', (p, obj, dx, dy) => { obj.x = dx; obj.y = dy - 70; });
+    
+    // Increased drag offset so finger is completely clear of the brush
+    scene.input.on('drag', (p, obj, dx, dy) => { 
+        obj.x = dx; 
+        obj.y = dy - 100; 
+    });
     
     scene.input.on('dragend', (p, obj) => {
         let hit = null;
         wordCards.forEach(c => {
-            if (Phaser.Math.Distance.Between(obj.x, obj.y, c.x, c.y) < 90) hit = c;
+            // Increased hit distance (generous target area)
+            if (Phaser.Math.Distance.Between(obj.x, obj.y, c.x, c.y) < 110) hit = c;
         });
 
         if (hit && hit.getData('key') === currentTarget.color) {
@@ -129,7 +143,7 @@ function startSetup(scene, colorKeys, totalRounds) {
             scene.time.delayedCall(1200, () => nextRound(scene));
         } else {
             scene.sound.play('wrong');
-            scene.tweens.add({ targets: obj, x: 780, y: 520, duration: 300 });
+            scene.tweens.add({ targets: obj, x: 780, y: 500, duration: 400, ease: 'Back.easeOut' });
         }
     });
 
@@ -140,23 +154,22 @@ function nextRound(scene) {
     if (trialCount >= gameQueue.length) {
         scene.sound.play('congrats');
         scene.add.rectangle(450, 300, 900, 600, 0x000000, 0.8).setDepth(1000);
-        scene.add.text(450, 300, '好叻呀！認得晒啲色喇！', { fontSize: '50px', fill: '#fff' }).setOrigin(0.5).setDepth(1001);
+        scene.add.text(450, 300, '你好努力呀！你認得晒喇！', { fontSize: '60px', fill: '#fff', align: 'center' }).setOrigin(0.5).setDepth(1001);
         scene.time.delayedCall(4000, () => window.location.reload());
         return;
     }
     
     currentTarget = gameQueue[trialCount];
     scoreText.setText('進度: ' + (trialCount + 1) + ' / ' + gameQueue.length);
-    brush.setPosition(780, 520).clearTint();
+    brush.setPosition(780, 500).clearTint();
     
     if (scene.textures.exists(currentTarget.obj)) {
         mainObject.setTexture(currentTarget.obj).clearTint();
         let r = mainObject.width / mainObject.height;
-        mainObject.displayHeight = 320; 
-        mainObject.displayWidth = 320 * r;
+        mainObject.displayHeight = 350; 
+        mainObject.displayWidth = 350 * r;
     }
 
-    // Play Voice immediately
     if (scene.cache.audio.exists(currentTarget.color + '_vo')) {
         scene.sound.play(currentTarget.color + '_vo');
     }
