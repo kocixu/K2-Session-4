@@ -1,213 +1,63 @@
-<!DOCTYPE html>
-<html lang="zh-Hant" class="h-full">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
-    <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
-    <script src="/_sdk/element_sdk.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
-    <style>
-        html, body { height: 100%; margin: 0; overflow: hidden; }
-        * { font-family: 'Nunito', sans-serif; user-select: none; -webkit-user-select: none; box-sizing: border-box; }
-
-        @media (max-width: 768px) {
-            .palette-board { max-width: 100%; padding: 16px 12px; }
-            .object-card { width: 160px !important; min-height: 150px; }
-            .object-svg { width: 80px !important; height: 80px !important; }
-            .speaker-btn { width: 56px !important; height: 56px !important; }
-            .speaker-btn i { width: 28px !important; height: 28px !important; }
-            .paint-blob { width: 48px !important; height: 48px !important; border-width: 3px !important; }
-            .level-btn { padding: 16px 24px !important; font-size: 18px !important; }
-            h1 { font-size: 32px !important; }
-            h2 { font-size: 40px !important; }
-            .text-lg, .text-xl { font-size: 16px !important; }
-        }
-
-        .paint-blob {
-            width: 52px; height: 52px; border-radius: 50%;
-            border: 4px solid #fff;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.25);
-            cursor: grab;
-            transition: transform 0.15s, box-shadow 0.15s;
-            position: relative;
-        }
-        .paint-blob:hover { transform: scale(1.15); box-shadow: 0 4px 16px rgba(0,0,0,0.35); }
-        .paint-blob.dragging { cursor: grabbing; transform: scale(1.2); opacity: 0.85; }
-
-        .palette-board {
-            background: linear-gradient(145deg, #8B6914, #A0782C, #6B5010);
-            border-radius: 20px;
-            padding: 20px 16px;
-            box-shadow: inset 0 2px 6px rgba(255,255,255,0.2), 0 6px 20px rgba(0,0,0,0.3);
-            border: 3px solid #5a4210;
-        }
-
-        .object-card {
-            background: rgba(255,255,255,0.95);
-            border-radius: 24px;
-            padding: 16px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-            min-height: 180px;
-        }
-        .object-card.colored { animation: colorPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
-        @keyframes colorPop { 0% { transform: scale(1); } 40% { transform: scale(1.1); } 100% { transform: scale(1); } }
-
-        .object-card.highlight { box-shadow: 0 0 0 4px #FFD700, 0 4px 20px rgba(255,215,0,0.4); }
-
-        .object-svg { width: 100px; height: 100px; filter: grayscale(100%) brightness(0.6); transition: filter 0.5s ease; }
-        .object-svg.colored-obj { filter: none; }
-
-        .paintbrush-cursor { position: fixed; pointer-events: none; z-index: 9999; transition: none; }
-
-        .speaker-btn {
-            background: linear-gradient(135deg, #FF6B6B, #FF8E53);
-            border: none; border-radius: 50%;
-            width: 64px; height: 64px;
-            display: flex; align-items: center; justify-content: center;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(255,107,107,0.4);
-            transition: transform 0.2s, box-shadow 0.2s;
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse { 0%,100% { box-shadow: 0 4px 15px rgba(255,107,107,0.4); } 50% { box-shadow: 0 4px 25px rgba(255,107,107,0.7); } }
-
-        .level-btn { padding: 20px 32px; border-radius: 20px; font-size: 22px; font-weight: 800; cursor: pointer; border: 4px solid transparent; transition: all 0.25s; text-align: center; }
-        .level-btn:hover { transform: translateY(-4px); box-shadow: 0 8px 25px rgba(0,0,0,0.2); }
-
-        .confetti { position: fixed; pointer-events: none; z-index: 10000; animation: confettiFall linear forwards; }
-        @keyframes confettiFall { 0% { transform: translateY(-10px) rotate(0deg); opacity: 1; } 100% { transform: translateY(600px) rotate(720deg); opacity: 0; } }
-
-        .star-particle { position: absolute; animation: starBurst 0.8s ease-out forwards; }
-        @keyframes starBurst { 0% { transform: scale(0) translate(0,0); opacity: 1; } 100% { transform: scale(1) translate(var(--tx), var(--ty)); opacity: 0; } }
-
-        .wrong-shake { animation: shake 0.4s ease-in-out; }
-        @keyframes shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(6px); } }
-
-        .progress-bar { height: 10px; border-radius: 5px; background: rgba(255,255,255,0.3); overflow: hidden; }
-        .progress-fill { height: 100%; border-radius: 5px; background: linear-gradient(90deg, #FFD700, #FFA500); transition: width 0.5s ease; }
-
-        .fade-in { animation: fadeIn 0.5s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        .game-bg { background: linear-gradient(135deg, #FF9F1C 0%, #FFBF69 50%, #FFD60A 100%); position: relative; overflow: hidden; }
-    </style>
-</head>
-<body class="h-full">
-    <div id="app" class="h-full w-full game-bg flex flex-col items-center justify-center relative">
-        <div id="levelSelect" class="flex flex-col items-center justify-center gap-6 fade-in px-4" style="z-index:10;">
-            <div class="text-center mb-2">
-                <div style="font-size:56px;">🎨</div>
-                <h1 id="titleText" class="text-white font-black text-3xl md:text-4xl drop-shadow-lg mt-2">顏色配對遊戲</h1>
-                <p class="text-white/80 text-lg mt-2">選擇關卡開始遊戲！</p>
-            </div>
-            <button class="level-btn" style="background: linear-gradient(135deg, #43e97b, #38f9d7); color: #1a5c3a;" onclick="startGame(1)"> ⭐ 第一關<br><span style="font-size:15px;font-weight:700;">紅色、黃色、綠色、藍色</span> </button>
-            <button class="level-btn" style="background: linear-gradient(135deg, #fa709a, #fee140); color: #7a2040;" onclick="startGame(2)"> ⭐⭐ 第二關<br><span style="font-size:15px;font-weight:700;">加上 橙色、紫色、黑色、白色</span> </button>
-        </div>
-
-        <div id="gameScreen" class="hidden w-full h-full flex flex-col" style="z-index:10;">
-            <div class="flex items-center justify-between px-3 md:px-4 pt-3 pb-1">
-                <button onclick="backToMenu()" class="bg-white/20 hover:bg-white/30 text-white rounded-full px-3 md:px-4 py-2 font-bold text-xs md:text-sm transition-all flex items-center gap-1">
-                    <i data-lucide="arrow-left" style="width:18px;height:18px;"></i> 返回
-                </button>
-                <div id="levelLabel" class="text-white font-black text-base md:text-lg drop-shadow"></div>
-                <div id="scoreLabel" class="text-white font-bold text-base md:text-lg">⭐ 0</div>
-            </div>
-            <div class="px-3 md:px-6 pb-2 w-full">
-                <div class="progress-bar"><div id="progressFill" class="progress-fill" style="width:0%"></div></div>
-            </div>
-            <div class="flex-1 flex flex-col md:flex-row items-center justify-center gap-4 px-4 pb-4">
-                <div class="flex flex-col items-center gap-3 flex-1">
-                    <div id="objectCard" class="object-card" style="width:200px;">
-                        <div id="objectSvg" class="object-svg"></div>
-                        <div id="objectLabel" class="font-black text-lg text-gray-700 mt-2"></div>
-                    </div>
-                    <button id="speakerBtn" class="speaker-btn" onclick="playCurrentAudio()">
-                        <i data-lucide="volume-2" style="width:32px;height:32px;color:#fff;"></i>
-                    </button>
-                    <div class="text-white/80 text-sm font-bold">點擊聽顏色 🔊</div>
-                </div>
-                <div class="flex flex-col items-center gap-2 flex-1">
-                    <div id="palette" class="palette-board flex flex-wrap gap-3 justify-center" style="max-width:260px;"></div>
-                    <div class="text-white/70 text-xs font-bold mt-1">拖動油漆到物件上 🖌️</div>
-                </div>
-            </div>
-        </div>
-
-        <div id="congratsScreen" class="hidden flex-col items-center justify-center gap-4 fade-in px-4" style="z-index:10;">
-            <div style="font-size:72px;">🎉</div>
-            <h2 class="text-white font-black text-4xl drop-shadow-lg">太棒了！</h2>
-            <p id="finalScore" class="text-white/90 text-xl font-bold"></p>
-            <div class="flex gap-3 mt-2">
-                <button onclick="backToMenu()" class="level-btn" style="background:linear-gradient(135deg,#43e97b,#38f9d7);color:#1a5c3a;font-size:18px;padding:14px 28px;"> 🏠 返回選單 </button>
-                <button id="nextLevelBtn" onclick="goNextLevel()" class="level-btn" style="background:linear-gradient(135deg,#fa709a,#fee140);color:#7a2040;font-size:18px;padding:14px 28px;"> ➡️ 下一關 </button>
-            </div>
-        </div>
-
-        <div id="floatingBrush" class="paintbrush-cursor hidden" style="font-size:40px;">🖌️</div>
-        <div id="feedbackToast" class="fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-2xl font-black text-xl shadow-lg hidden" style="z-index:10001;"></div>
-    </div>
-
 <script>
-// ===== AUDIO SYSTEM =====
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+// ===== CONFIGURATION =====
+const GITHUB_BASE = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/assets/";
 
-function playTone(freq, duration, type='sine', vol=0.3) {
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    const o = audioCtx.createOscillator();
-    const g = audioCtx.createGain();
-    o.type = type; o.frequency.value = freq;
-    g.gain.setValueAtTime(vol, audioCtx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-    o.connect(g); g.connect(audioCtx.destination);
-    o.start(); o.stop(audioCtx.currentTime + duration);
+const AUDIO_FILES = {
+    intro: 'wo_xiang_yao.mp3',
+    colors: {
+        '紅色': 'red.mp3', '黃色': 'yellow.mp3', '綠色': 'green.mp3', '藍色': 'blue.mp3',
+        '橙色': 'orange.mp3', '紫色': 'purple.mp3', '黑色': 'black.mp3', '白色': 'white.mp3'
+    },
+    objects: {
+        '鞋': 'shoe.mp3', '水樽': 'bottle.mp3', '紙': 'paper.mp3', '書包': 'bag.mp3'
+    },
+    ui: {
+        correct: 'correct.mp3',
+        wrong: 'wrong.mp3',
+        cheer: 'cheer.mp3'
+    }
+};
+
+// ===== STABLE AUDIO ENGINE =====
+async function playAudioSequence(colorName, objectName) {
+    const files = [
+        GITHUB_BASE + AUDIO_FILES.intro,
+        GITHUB_BASE + AUDIO_FILES.colors[colorName],
+        GITHUB_BASE + AUDIO_FILES.objects[objectName]
+    ];
+
+    for (const src of files) {
+        await new Promise((resolve) => {
+            const audio = new Audio(src);
+            audio.onended = resolve;
+            audio.onerror = resolve; // Skip if file missing
+            audio.play().catch(e => {
+                console.log("Playback blocked or failed:", e);
+                resolve(); 
+            });
+        });
+    }
 }
 
-function playCorrectSound() { playTone(523, 0.15); setTimeout(() => playTone(659, 0.15), 100); setTimeout(() => playTone(784, 0.3), 200); }
-function playWrongSound() { playTone(200, 0.25, 'sawtooth', 0.15); setTimeout(() => playTone(160, 0.35, 'sawtooth', 0.15), 150); }
-
-function playCongratsSound() {
-    [523, 587, 659, 784, 880, 1047].forEach((n, i) => setTimeout(() => playTone(n, 0.2), i * 120));
+function playEffect(type) {
+    const audio = new Audio(GITHUB_BASE + AUDIO_FILES.ui[type]);
+    audio.play().catch(() => {});
 }
 
-function speakPhrase(text) {
-    // Crucial: Resume audio context on every speech attempt
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'zh-HK';
-    u.rate = 0.85;
-    u.pitch = 1.1;
-    window.speechSynthesis.speak(u);
-}
-
-// ===== GAME DATA =====
-const COLORS = { '紅色': '#E53935', '黃色': '#FDD835', '綠色': '#43A047', '藍色': '#1E88E5', '橙色': '#FB8C00', '紫色': '#8E24AA', '黑色': '#333333', '白色': '#F5F5F5' };
-const LEVEL_COLORS = { 1: ['紅色','黃色','綠色','藍色'], 2: ['紅色','黃色','綠色','藍色','橙色','紫色','黑色','白色'] };
-const OBJECTS = [
-    { name: '水樽', svg: `<svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg"><rect x="35" y="5" width="30" height="12" rx="3" fill="#999" class="obj-part"/><rect x="25" y="17" width="50" height="8" rx="2" fill="#888" class="obj-part"/><path d="M25 25 Q20 30 20 45 L20 105 Q20 115 30 115 L70 115 Q80 115 80 105 L80 45 Q80 30 75 25 Z" fill="#AAA" class="obj-main"/></svg>` },
-    { name: '書包', svg: `<svg viewBox="0 0 110 110" xmlns="http://www.w3.org/2000/svg"><rect x="15" y="30" width="80" height="70" rx="12" fill="#AAA" class="obj-main"/><rect x="30" y="20" width="50" height="20" rx="8" fill="#999" class="obj-part"/></svg>` },
-    { name: '紙', svg: `<svg viewBox="0 0 90 110" xmlns="http://www.w3.org/2000/svg"><path d="M10 10 L65 10 L80 25 L80 100 L10 100 Z" fill="#DDD" class="obj-main"/><path d="M65 10 L65 25 L80 25" fill="#BBB" class="obj-part"/></svg>` },
-    { name: '鞋', svg: `<svg viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg"><path d="M30 20 Q25 15 20 20 L15 50 Q10 65 25 65 L100 65 Q115 65 110 55 L105 45 Q95 30 75 30 L50 30 Q40 30 35 25 Z" fill="#AAA" class="obj-main"/><path d="M25 65 L100 65 Q115 65 110 55 L105 50 Q60 55 25 58 Z" fill="#999" class="obj-part"/></svg>` }
-];
-
-let currentLevel = 1, currentRound = 0, score = 0, rounds = [], currentTargetColor = '', currentObject = null, draggingColor = null, isDragging = false;
-
-function shuffle(arr) { return [...arr].sort(() => Math.random() - 0.5); }
+// ===== UPDATED GAME LOGIC =====
 
 function startGame(level) {
-    // AUDIO UNLOCK
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    playTone(440, 0.05, 'sine', 0.01); // Silent unlock
-
+    // Critical for iOS: The click that triggers this function unlocks audio
     currentLevel = level; score = 0; currentRound = 0;
     rounds = [];
     const colors = LEVEL_COLORS[level];
     const count = level === 1 ? 5 : 10;
+    
     for(let i=0; i<count; i++) {
-        rounds.push({ object: OBJECTS[i % OBJECTS.length], color: colors[Math.floor(Math.random()*colors.length)] });
+        rounds.push({ 
+            object: OBJECTS[i % OBJECTS.length], 
+            color: colors[Math.floor(Math.random()*colors.length)] 
+        });
     }
     rounds = shuffle(rounds);
 
@@ -219,60 +69,33 @@ function startGame(level) {
 }
 
 function loadRound() {
-    if (currentRound >= rounds.length) { showCongrats(); return; }
+    if (currentRound >= rounds.length) { 
+        showCongrats(); 
+        return; 
+    }
     const r = rounds[currentRound];
-    currentTargetColor = r.color; currentObject = r.object;
+    currentTargetColor = r.color; 
+    currentObject = r.object;
 
     document.getElementById('objectSvg').innerHTML = r.object.svg;
     document.getElementById('objectSvg').classList.remove('colored-obj');
     document.getElementById('objectLabel').textContent = r.object.name;
     document.getElementById('progressFill').style.width = ((currentRound / rounds.length) * 100) + '%';
     
-    // Auto play audio immediately (no delay to bypass browser blocks)
-    playCurrentAudio();
+    // Play the sequence
+    playAudioSequence(currentTargetColor, currentObject.name);
 }
 
 function playCurrentAudio() {
-    speakPhrase(`我想要${currentTargetColor}嘅${currentObject.name}`);
+    playAudioSequence(currentTargetColor, currentObject.name);
 }
 
-function buildPalette() {
-    const pal = document.getElementById('palette');
-    pal.innerHTML = '';
-    LEVEL_COLORS[currentLevel].forEach(cName => {
-        const blob = document.createElement('div');
-        blob.className = 'paint-blob';
-        blob.style.backgroundColor = COLORS[cName];
-        if (cName === '白色') blob.style.border = '4px solid #ccc';
-        
-        const startDrag = (e) => {
-            e.preventDefault();
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            draggingColor = cName; isDragging = true;
-            blob.classList.add('dragging');
-            const brush = document.getElementById('floatingBrush');
-            brush.classList.remove('hidden'); brush.style.color = COLORS[cName];
-            moveBrush(e);
-        };
-        blob.addEventListener('mousedown', startDrag);
-        blob.addEventListener('touchstart', startDrag, { passive: false });
-        pal.appendChild(blob);
-    });
-}
-
-function moveBrush(e) {
-    const brush = document.getElementById('floatingBrush');
-    const cx = e.touches ? e.touches[0].clientX : e.clientX;
-    const cy = e.touches ? e.touches[0].clientY : e.clientY;
-    brush.style.left = (cx - 20) + 'px'; brush.style.top = (cy - 40) + 'px';
-}
-
+// Updated endDrag to use new sound effects
 function endDrag(e) {
     if (!isDragging) return;
     isDragging = false;
     document.getElementById('floatingBrush').classList.add('hidden');
-    document.querySelectorAll('.paint-blob').forEach(b => b.classList.remove('dragging'));
-
+    
     const card = document.getElementById('objectCard');
     const rect = card.getBoundingClientRect();
     const cx = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
@@ -280,15 +103,16 @@ function endDrag(e) {
 
     if (cx >= rect.left && cx <= rect.right && cy >= rect.top && cy <= rect.bottom) {
         if (draggingColor === currentTargetColor) {
-            playCorrectSound();
-            score++; document.getElementById('scoreLabel').textContent = '⭐ ' + score;
+            playEffect('correct');
+            score++; 
+            document.getElementById('scoreLabel').textContent = '⭐ ' + score;
             const svg = document.getElementById('objectSvg');
             svg.classList.add('colored-obj');
             svg.querySelectorAll('.obj-main').forEach(p => p.setAttribute('fill', COLORS[currentTargetColor]));
             currentRound++;
-            setTimeout(loadRound, 1200);
+            setTimeout(loadRound, 1500);
         } else {
-            playWrongSound();
+            playEffect('wrong');
             card.classList.add('wrong-shake');
             setTimeout(() => card.classList.remove('wrong-shake'), 400);
         }
@@ -296,21 +120,11 @@ function endDrag(e) {
     draggingColor = null;
 }
 
-document.addEventListener('mousemove', (e) => { if (isDragging) moveBrush(e); });
-document.addEventListener('touchmove', (e) => { if (isDragging) { e.preventDefault(); moveBrush(e); } }, { passive: false });
-document.addEventListener('mouseup', endDrag); document.addEventListener('touchend', endDrag);
-
-function showScreen(id) {
-    ['levelSelect','gameScreen','congratsScreen'].forEach(s => document.getElementById(s).classList.add('hidden'));
-    document.getElementById(id).classList.remove('hidden');
-    document.getElementById(id).classList.add('flex');
+function showCongrats() { 
+    playEffect('cheer'); 
+    showScreen('congratsScreen'); 
+    document.getElementById('finalScore').textContent = `得分: ${score} / ${rounds.length}`; 
 }
-
-function backToMenu() { showScreen('levelSelect'); }
-function showCongrats() { playCongratsSound(); showScreen('congratsScreen'); document.getElementById('finalScore').textContent = `得分: ${score} / ${rounds.length}`; }
-function goNextLevel() { startGame(2); }
 
 lucide.createIcons();
 </script>
-</body>
-</html>
