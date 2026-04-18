@@ -114,7 +114,7 @@
 
 <script>
 // REPLACE WITH YOUR GITHUB REPO DETAILS
-const GITHUB_BASE = "https://raw.githubusercontent.com/kocixu/K2-Session-4-colour/main/assets/";
+const GITHUB_BASE = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/assets/";
 
 const AUDIO_FILES = {
     intro: 'wo_xiang_yao.mp3',
@@ -154,7 +154,7 @@ async function playAudioSequence(colorName, objectName) {
         await new Promise((resolve) => {
             const audio = new Audio(src);
             audio.onended = () => {
-                setTimeout(resolve, 100); // Tiny "breath" gap
+                setTimeout(resolve, 50); // Tiny "breath" gap
             };
             audio.onerror = resolve;
             audio.play().catch(resolve);
@@ -189,4 +189,87 @@ function loadRound() {
     currentTargetColor = r.color; currentObject = r.object;
     document.getElementById('objectSvg').innerHTML = r.object.svg;
     document.getElementById('objectSvg').classList.remove('colored-obj');
-    document.getElementById('objectLabel').textContent = r.object
+    document.getElementById('objectLabel').textContent = r.object.name;
+    document.getElementById('progressFill').style.width = ((currentRound / rounds.length) * 100) + '%';
+    playCurrentAudio();
+}
+
+function playCurrentAudio() {
+    playAudioSequence(currentTargetColor, currentObject.name);
+}
+
+function buildPalette() {
+    const pal = document.getElementById('palette');
+    pal.innerHTML = '';
+    LEVEL_COLORS[currentLevel].forEach(cName => {
+        const blob = document.createElement('div');
+        blob.className = 'paint-blob';
+        blob.style.backgroundColor = COLORS[cName];
+        
+        const startDrag = (e) => {
+            e.preventDefault();
+            draggingColor = cName; isDragging = true;
+            blob.classList.add('dragging');
+            document.getElementById('floatingBrush').classList.remove('hidden');
+            document.getElementById('floatingBrush').style.color = COLORS[cName];
+            moveBrush(e);
+        };
+        blob.addEventListener('mousedown', startDrag);
+        blob.addEventListener('touchstart', startDrag, { passive: false });
+        pal.appendChild(blob);
+    });
+}
+
+function moveBrush(e) {
+    const brush = document.getElementById('floatingBrush');
+    const cx = e.touches ? e.touches[0].clientX : e.clientX;
+    const cy = e.touches ? e.touches[0].clientY : e.clientY;
+    brush.style.left = (cx - 20) + 'px'; brush.style.top = (cy - 40) + 'px';
+}
+
+function endDrag(e) {
+    if (!isDragging) return;
+    isDragging = false;
+    document.getElementById('floatingBrush').classList.add('hidden');
+    document.querySelectorAll('.paint-blob').forEach(b => b.classList.remove('dragging'));
+
+    const card = document.getElementById('objectCard');
+    const rect = card.getBoundingClientRect();
+    const cx = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+    const cy = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+
+    if (cx >= rect.left && cx <= rect.right && cy >= rect.top && cy <= rect.bottom) {
+        if (draggingColor === currentTargetColor) {
+            playEffect('correct');
+            score++; 
+            document.getElementById('scoreLabel').textContent = '⭐ ' + score;
+            const svg = document.getElementById('objectSvg');
+            svg.classList.add('colored-obj');
+            svg.querySelectorAll('.obj-main').forEach(p => p.setAttribute('fill', COLORS[currentTargetColor]));
+            currentRound++;
+            setTimeout(loadRound, 600);
+        } else {
+            playEffect('wrong');
+            card.classList.add('wrong-shake');
+            setTimeout(() => card.classList.remove('wrong-shake'), 400);
+        }
+    }
+}
+
+document.addEventListener('mousemove', (e) => { if (isDragging) moveBrush(e); });
+document.addEventListener('touchmove', (e) => { if (isDragging) moveBrush(e); }, { passive: false });
+document.addEventListener('mouseup', endDrag); document.addEventListener('touchend', endDrag);
+
+function showScreen(id) {
+    ['levelSelect','gameScreen','congratsScreen'].forEach(s => document.getElementById(s).classList.add('hidden'));
+    document.getElementById(id).classList.remove('hidden');
+    document.getElementById(id).classList.add('flex');
+}
+
+function backToMenu() { showScreen('levelSelect'); }
+function showCongrats() { playEffect('cheer'); showScreen('congratsScreen'); document.getElementById('finalScore').textContent = `得分: ${score} / ${rounds.length}`; }
+
+lucide.createIcons();
+</script>
+</body>
+</html>
