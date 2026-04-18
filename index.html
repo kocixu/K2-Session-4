@@ -98,9 +98,7 @@
                         <i data-lucide="volume-2" style="width:32px;height:32px;color:#fff;"></i>
                     </button>
                 </div>
-                <div class="flex flex-col items-center gap-2">
-                    <div id="palette" class="palette-board flex flex-wrap gap-3 justify-center" style="max-width:260px;"></div>
-                </div>
+                <div id="palette" class="palette-board flex flex-wrap gap-3 justify-center" style="max-width:260px;"></div>
             </div>
         </div>
 
@@ -115,8 +113,8 @@
     </div>
 
 <script>
-// ===== CONFIGURATION - CHANGE YOUR_USERNAME AND YOUR_REPO =====
-const GITHUB_BASE = "https://raw.githubusercontent.com/kocixu/K2-Session-4-colour/main/assets/";
+// REPLACE WITH YOUR GITHUB REPO DETAILS
+const GITHUB_BASE = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/assets/";
 
 const AUDIO_FILES = {
     intro: 'wo_xiang_yao.mp3',
@@ -134,7 +132,6 @@ const AUDIO_FILES = {
     }
 };
 
-// ===== GAME DATA =====
 const COLORS = { '紅色': '#E53935', '黃色': '#FDD835', '綠色': '#43A047', '藍色': '#1E88E5', '橙色': '#FB8C00', '紫色': '#8E24AA', '黑色': '#333333', '白色': '#F5F5F5' };
 const LEVEL_COLORS = { 1: ['紅色','黃色','綠色','藍色'], 2: ['紅色','黃色','綠色','藍色','橙色','紫色','黑色','白色'] };
 const OBJECTS = [
@@ -146,7 +143,7 @@ const OBJECTS = [
 
 let currentLevel = 1, currentRound = 0, score = 0, rounds = [], currentTargetColor = '', currentObject = null, draggingColor = null, isDragging = false;
 
-// ===== NATURAL OVERLAP AUDIO ENGINE =====
+// ===== UPDATED FLUENT AUDIO ENGINE =====
 async function playAudioSequence(colorName, objectName) {
     const files = [
         GITHUB_BASE + AUDIO_FILES.intro,
@@ -156,18 +153,11 @@ async function playAudioSequence(colorName, objectName) {
     for (const src of files) {
         await new Promise((resolve) => {
             const audio = new Audio(src);
-            audio.play().catch(resolve);
-            
-            // Starts next file 0s before end to create a natural sentence flow
-            const overlapTime = 0; 
-            audio.ontimeupdate = () => {
-                if (audio.duration && (audio.duration - audio.currentTime < overlapTime)) {
-                    resolve();
-                    audio.ontimeupdate = null;
-                }
+            audio.onended = () => {
+                setTimeout(resolve, 50); // Tiny "breath" gap
             };
-            audio.onended = resolve;
-            audio.onerror = resolve; 
+            audio.onerror = resolve;
+            audio.play().catch(resolve);
         });
     }
 }
@@ -176,7 +166,6 @@ function playEffect(type) {
     new Audio(GITHUB_BASE + AUDIO_FILES.ui[type]).play().catch(()=>{});
 }
 
-// ===== GAME LOGIC =====
 function shuffle(arr) { return [...arr].sort(() => Math.random() - 0.5); }
 
 function startGame(level) {
@@ -200,87 +189,4 @@ function loadRound() {
     currentTargetColor = r.color; currentObject = r.object;
     document.getElementById('objectSvg').innerHTML = r.object.svg;
     document.getElementById('objectSvg').classList.remove('colored-obj');
-    document.getElementById('objectLabel').textContent = r.object.name;
-    document.getElementById('progressFill').style.width = ((currentRound / rounds.length) * 100) + '%';
-    playCurrentAudio();
-}
-
-function playCurrentAudio() {
-    playAudioSequence(currentTargetColor, currentObject.name);
-}
-
-function buildPalette() {
-    const pal = document.getElementById('palette');
-    pal.innerHTML = '';
-    LEVEL_COLORS[currentLevel].forEach(cName => {
-        const blob = document.createElement('div');
-        blob.className = 'paint-blob';
-        blob.style.backgroundColor = COLORS[cName];
-        
-        const startDrag = (e) => {
-            e.preventDefault();
-            draggingColor = cName; isDragging = true;
-            blob.classList.add('dragging');
-            document.getElementById('floatingBrush').classList.remove('hidden');
-            document.getElementById('floatingBrush').style.color = COLORS[cName];
-            moveBrush(e);
-        };
-        blob.addEventListener('mousedown', startDrag);
-        blob.addEventListener('touchstart', startDrag, { passive: false });
-        pal.appendChild(blob);
-    });
-}
-
-function moveBrush(e) {
-    const brush = document.getElementById('floatingBrush');
-    const cx = e.touches ? e.touches[0].clientX : e.clientX;
-    const cy = e.touches ? e.touches[0].clientY : e.clientY;
-    brush.style.left = (cx - 20) + 'px'; brush.style.top = (cy - 40) + 'px';
-}
-
-function endDrag(e) {
-    if (!isDragging) return;
-    isDragging = false;
-    document.getElementById('floatingBrush').classList.add('hidden');
-    document.querySelectorAll('.paint-blob').forEach(b => b.classList.remove('dragging'));
-
-    const card = document.getElementById('objectCard');
-    const rect = card.getBoundingClientRect();
-    const cx = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
-    const cy = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
-
-    if (cx >= rect.left && cx <= rect.right && cy >= rect.top && cy <= rect.bottom) {
-        if (draggingColor === currentTargetColor) {
-            playEffect('correct');
-            score++; document.getElementById('scoreLabel').textContent = '⭐ ' + score;
-            const svg = document.getElementById('objectSvg');
-            svg.classList.add('colored-obj');
-            svg.querySelectorAll('.obj-main').forEach(p => p.setAttribute('fill', COLORS[currentTargetColor]));
-            currentRound++;
-            // Rapid round transition (600ms)
-            setTimeout(loadRound, 600);
-        } else {
-            playEffect('wrong');
-            card.classList.add('wrong-shake');
-            setTimeout(() => card.classList.remove('wrong-shake'), 400);
-        }
-    }
-}
-
-document.addEventListener('mousemove', (e) => { if (isDragging) moveBrush(e); });
-document.addEventListener('touchmove', (e) => { if (isDragging) moveBrush(e); }, { passive: false });
-document.addEventListener('mouseup', endDrag); document.addEventListener('touchend', endDrag);
-
-function showScreen(id) {
-    ['levelSelect','gameScreen','congratsScreen'].forEach(s => document.getElementById(s).classList.add('hidden'));
-    document.getElementById(id).classList.remove('hidden');
-    document.getElementById(id).classList.add('flex');
-}
-
-function backToMenu() { showScreen('levelSelect'); }
-function showCongrats() { playEffect('cheer'); showScreen('congratsScreen'); document.getElementById('finalScore').textContent = `得分: ${score} / ${rounds.length}`; }
-
-lucide.createIcons();
-</script>
-</body>
-</html>
+    document.getElementById('objectLabel').textContent = r.object
